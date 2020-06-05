@@ -32,10 +32,10 @@ func getParameters(remoteFilePath, hostsTablePath *string, initConfig *bool, num
 	flag.Parse()
 }
 
-func deploy(initConfigure bool, hostsTablePath, remoteFilePath string) error {
+func deploy(initConfigure bool, hostsTablePath, remoteFilePath string, num int) error {
 	var err error
 	if initConfigure {
-		_, err = tools.CreateNewConfigure(0, 10, storagePath)
+		_, err = tools.CreateNewConfigure(0, num, storagePath)
 		if err != nil {
 			log.Error().Err(err).Msg("fail to create the nodes configure file")
 			return err
@@ -57,12 +57,39 @@ func deploy(initConfigure bool, hostsTablePath, remoteFilePath string) error {
 	}
 
 	for _, ip := range hostIPs {
+
+		go func(nodeIP string) {
+		}(ip)
+
 		out, err := remote.RunCommand(ip, pemLocation, "ufw disable", true)
 		if err != nil {
 			log.Error().Err(err).Msg("error in running remote command")
 			return err
 		}
 		log.Info().Msg(out)
+		// test existing of file
+		out, err = remote.RunCommand(ip, pemLocation, "ls /home/ubuntu/go-tss/benchmark_docker/Data/data_local/", true)
+		if err != nil {
+			log.Error().Err(err).Msg("error in running remote command")
+			return err
+		}
+		if strings.Contains(out, " No such file or directory") {
+			log.Info().Msg("we create the directory")
+			out, err = remote.RunCommand(ip, pemLocation, "mkdir -p /home/ubuntu/go-tss/benchmark_docker/Data/data_local/", true)
+			if err != nil {
+				log.Error().Err(err).Msg("error in running remote command")
+				return err
+			}
+			log.Info().Msg(out)
+		}
+		// clone the tss code
+		out, err = remote.RunCommand(ip, pemLocation, "git clone https://gitlab.com/thorchain/tss/go-tss.git /home/ubuntu/go-tss/go-tss", true)
+		if err != nil {
+			log.Error().Err(err).Msg("error in running remote command")
+			return err
+		}
+		log.Info().Msg(out)
+
 	}
 
 	// we send the configuration file and the docker compose file
@@ -116,12 +143,13 @@ func main() {
 	getParameters(&remoteFilePath, &hostsTablePath, &initConfigure, &num, &option)
 	switch option {
 	case 1:
-		err := deploy(initConfigure, hostsTablePath, remoteFilePath)
+		err := deploy(initConfigure, hostsTablePath, remoteFilePath, num)
 		if err != nil {
 			log.Error().Err(err).Msg("fail to deploy the nodes")
 		}
 		return
 	case 2:
+		// keygen test
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
 		if err != nil {
 			return
@@ -132,11 +160,12 @@ func main() {
 		}
 		fmt.Println(poolPubKey)
 	case 3:
+		// keysign test
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
 		if err != nil {
 			return
 		}
-		poolKey := "thorpub1addwnpepqdh6jcqqwx3kpgqn5krhks2ejpm5kp38j4s720f2hkc6ygv9akfk2xrlf4x"
+		poolKey := "thorpub1addwnpepqw4cv0yd7pe0trct9szyfgz5tw5ndv8a9zj50jjn0r7p4nsrayat5lx494a"
 		tss.KeySign("hello", poolKey, inputIPs, ports, inputKeys)
 	default:
 		fmt.Println("not supported!!!")

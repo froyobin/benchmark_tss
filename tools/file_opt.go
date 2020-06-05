@@ -10,6 +10,6 @@ func LoadStringData(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	pubKeys := strings.Split(string(input), "\n")
-	return pubKeys, nil
+	data := strings.Split(string(input), "\n")
+	return data, nil
 }

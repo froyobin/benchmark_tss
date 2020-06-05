@@ -17,6 +17,7 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 		return "", err
 	}
 	cmd.Stdout = &out
+	cmd.Stderr = &out
 	cmd.Start()
 	var cmdSent, username string
 
