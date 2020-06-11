@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -23,7 +24,7 @@ const (
 )
 
 func getParameters(remoteFilePath, hostsTablePath *string, initConfig *bool, num, option *int) {
-	flag.IntVar(num, "n", 10, "how many nodes we deploy")
+	flag.IntVar(num, "n", 25, "how many nodes we deploy")
 	flag.IntVar(option, "opt", 2, "how many nodes we deploy")
 	flag.BoolVar(initConfig, "init", false, "recreate the test nodes keypairs")
 	flag.StringVar(hostsTablePath, "h", "hosts.txt", "path of the host table")
@@ -32,35 +33,11 @@ func getParameters(remoteFilePath, hostsTablePath *string, initConfig *bool, num
 	flag.Parse()
 }
 
-func deploy(initConfigure bool, hostsTablePath, remoteFilePath string, num int) error {
-	var err error
-	if initConfigure {
-		_, err = tools.CreateNewConfigure(0, num, storagePath)
-		if err != nil {
-			log.Error().Err(err).Msg("fail to create the nodes configure file")
-			return err
-		}
-	}
-
-	hostIPs, err := tools.LoadStringData(hostsTablePath)
-	if err != nil {
-		log.Error().Err(err).Msg("fail to read the host file")
-		return err
-	}
-	bootstrapIP := hostIPs[0]
-
-	// everytime we run, we update the bootstrap node IP address
-	err = tools.UpdateBootstrapNode(bootstrapIP, 10, storagePath)
-	if err != nil {
-		log.Error().Err(err).Msg("fail to update the bootstrapIP")
-		return err
-	}
-
-	for _, ip := range hostIPs {
-
-		go func(nodeIP string) {
-		}(ip)
-
+func doJob(i int, jobs chan string, hosts []string, dones chan<- struct{}) error {
+	defer func() {
+		dones <- struct{}{}
+	}()
+	for ip := range jobs {
 		out, err := remote.RunCommand(ip, pemLocation, "ufw disable", true)
 		if err != nil {
 			log.Error().Err(err).Msg("error in running remote command")
@@ -89,7 +66,67 @@ func deploy(initConfigure bool, hostsTablePath, remoteFilePath string, num int) 
 			return err
 		}
 		log.Info().Msg(out)
+	}
+	return nil
+}
 
+func addJob(jobs chan<- string, tasks []string) {
+	for _, el := range tasks {
+		// filter out the empty ip address
+		if len(el) == 0 {
+			continue
+		}
+		jobs <- el
+	}
+	close(jobs)
+}
+
+func deploy(initConfigure bool, hostsTablePath, remoteFilePath string, num int) error {
+	var err error
+	if initConfigure {
+		fmt.Printf(">>>>>>%v\n", num)
+		_, err = tools.CreateNewConfigure(0, num, storagePath)
+		if err != nil {
+			log.Error().Err(err).Msg("fail to create the nodes configure file")
+			return err
+		}
+	}
+
+	hostIPs, err := tools.LoadStringData(hostsTablePath)
+	// as the last element of hostIP is empty, so we avoid the last entry
+	hostIPs = hostIPs[:len(hostIPs)-1]
+	if err != nil {
+		log.Error().Err(err).Msg("fail to read the host file")
+		return err
+	}
+	bootstrapIP := hostIPs[0]
+
+	// everytime we run, we update the bootstrap node IP address
+	err = tools.UpdateBootstrapNode(bootstrapIP, num, storagePath)
+	if err != nil {
+		log.Error().Err(err).Msg("fail to update the bootstrapIP")
+		return err
+	}
+	// we set we have 5 threads do the command
+	worker := 5
+	working := worker
+	dones := make(chan struct{}, worker)
+	jobs := make(chan string, worker)
+	done := false
+	go addJob(jobs, hostIPs)
+	for i := 0; i < worker; i++ {
+		go doJob(i, jobs, hostIPs, dones)
+	}
+
+	for {
+		<-dones
+		working -= 1
+		if working <= 0 {
+			done = true
+		}
+		if done == true {
+			break
+		}
 	}
 
 	// we send the configuration file and the docker compose file
@@ -139,7 +176,7 @@ func main() {
 	var initConfigure bool
 	var num, option int
 	pubKeyPath := "storage/pubkeys.txt"
-
+	// if  initConfig is set true, we will regeneraet the keysoters for num of nodes
 	getParameters(&remoteFilePath, &hostsTablePath, &initConfigure, &num, &option)
 	switch option {
 	case 1:
@@ -154,19 +191,32 @@ func main() {
 		if err != nil {
 			return
 		}
-		poolPubKey, err := tss.KeyGen(inputKeys, inputIPs, ports)
-		if err != nil {
-			return
+		timeBefore := time.Now()
+		for i := 0; i < 10; i++ {
+			poolPubKey, err := tss.KeyGen(inputKeys, inputIPs, ports)
+			if err != nil {
+				fmt.Printf("We quit As saw errors!!!")
+				return
+			}
+			fmt.Println(poolPubKey)
 		}
-		fmt.Println(poolPubKey)
+		fmt.Printf("time we spend is %v\n", time.Now().Sub(timeBefore)/10)
 	case 3:
 		// keysign test
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
 		if err != nil {
 			return
 		}
-		poolKey := "thorpub1addwnpepqw4cv0yd7pe0trct9szyfgz5tw5ndv8a9zj50jjn0r7p4nsrayat5lx494a"
-		tss.KeySign("hello", poolKey, inputIPs, ports, inputKeys)
+		timeBefore := time.Now()
+		poolKey := "thorpub1addwnpepqgxtq2zxnhjp6ezspfxyn7nqqjkwauetr6cuhj70n7pj4rqx4jgpcjmvuum"
+		for i := 0; i < 10; i++ {
+			err := tss.KeySign("hello"+string(i), poolKey, inputIPs, ports, inputKeys)
+			if err != nil {
+				fmt.Printf("######we quit as saw the error!!!")
+				return
+			}
+		}
+		fmt.Printf("time we spend is %v\n", time.Now().Sub(timeBefore)/10)
 	default:
 		fmt.Println("not supported!!!")
 		return

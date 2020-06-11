@@ -73,13 +73,27 @@ func doCommand(ip, remoteFile, filePath, pemLocation string, send bool, digitalO
 	return err
 }
 
-func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation string, isDigitalOcean bool) error {
-	var runErr error
+func addJob(jobs chan<- int, tasksNum int) {
+	for i := 0; i < tasksNum; i++ {
+		jobs <- i
+	}
+	close(jobs)
+}
+
+func doJob(i int, jobs chan int, ips []string, localFilePath, remoteFilePath, pemLocation string, isDigitalOcean bool, dones chan<- struct{}) {
 	var filePath string
+
 	dockerPath := fmt.Sprintf("%s/docker-compose.yml", localFilePath)
 	remoteConfigure := path.Join(remoteFilePath, "run.sh")
 	remoteDonfigure := path.Join(remoteFilePath, "docker-compose.yml")
-	for index, el := range ips {
+	defer func() {
+		dones <- struct{}{}
+	}()
+	for index := range jobs {
+		el := ips[index]
+		if len(el) == 0 {
+			continue
+		}
 		if index == 0 {
 			filePath = "storage/0/run.sh"
 		} else {
@@ -87,15 +101,39 @@ func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation string,
 		}
 		err := doCommand(el, remoteConfigure, filePath, pemLocation, true, isDigitalOcean)
 		if err != nil {
-			runErr = err
 			log.Error().Err(err).Msgf("!!!fail to send to node %s\n", el)
 		}
 		err = doCommand(el, remoteDonfigure, dockerPath, pemLocation, true, isDigitalOcean)
 		if err != nil {
-			runErr = err
 			log.Error().Err(err).Msgf("!!!fail to send to node %s\n", el)
 		}
+	}
+}
 
+func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation string, isDigitalOcean bool) error {
+	var runErr error
+
+	worker := 5
+	working := worker
+	dones := make(chan struct{}, worker)
+	jobs := make(chan int, worker)
+	done := false
+
+	go addJob(jobs, len(ips))
+
+	for i := 0; i < worker; i++ {
+		go doJob(i, jobs, ips, localFilePath, remoteFilePath, pemLocation, isDigitalOcean, dones)
+	}
+
+	for {
+		<-dones
+		working -= 1
+		if working <= 0 {
+			done = true
+		}
+		if done == true {
+			break
+		}
 	}
 
 	return runErr
