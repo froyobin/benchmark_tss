@@ -8,7 +8,7 @@ import (
 func TestCreateNewConfigure(t *testing.T) {
 	seretkey := "YzQ1NjI5Zjc2MmVkNTBjY2M2ODFjYzExODNhNDhjYmMyOGUzMjkxZmE0M2QyZTY5ZTczMGIxMGJkZjAyZmM1OA=="
 
-	raw, _ := getP2PIDFromPrivKey(seretkey)
+	raw, _ := GetP2PIDFromPrivKey(seretkey)
 	fmt.Println(raw)
 }
 

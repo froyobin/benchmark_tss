@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"path"
 	"strings"
 
 	sdkkey "github.com/binance-chain/go-sdk/keys"
@@ -17,7 +18,7 @@ import (
 	"gitlab.com/thorchain/bepswap/thornode/cmd"
 )
 
-func setupBech32Prefix() {
+func SetupBech32Prefix() {
 	config := sdk.GetConfig()
 	config.SetBech32PrefixForAccount(cmd.Bech32PrefixAccAddr, cmd.Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(cmd.Bech32PrefixValAddr, cmd.Bech32PrefixValPub)
@@ -25,7 +26,7 @@ func setupBech32Prefix() {
 	config.Seal()
 }
 
-func getP2PIDFromPrivKey(priKeyString string) (string, error) {
+func GetP2PIDFromPrivKey(priKeyString string) (string, error) {
 	priHexBytes, err := base64.StdEncoding.DecodeString(priKeyString)
 	if err != nil {
 		return "", fmt.Errorf("fail to decode private key: %w", err)
@@ -50,12 +51,45 @@ func getP2PIDFromPrivKey(priKeyString string) (string, error) {
 	return id.String(), nil
 }
 
-func UpdateBootstrapNode(ip string, num int, path string) error {
+func UpdateExternalIP(ips []string, filepath string) error {
+	// we always update from the first node, skip the bootstrap node
+	for i, ip := range ips {
+		target := fmt.Sprintf("%s/%d", filepath, i)
+		out := target + "/deployed_run.sh"
+		var in string
+		if i == 0 {
+			in = path.Join(target, "/run.sh")
+		} else {
+			in = path.Join(target, "/deployed_run_phase1.sh")
+		}
+		input, err := ioutil.ReadFile(in)
+		if err != nil {
+			return err
+		}
+
+		lines := strings.Split(string(input), "\n")
+		for li, line := range lines {
+			if strings.Contains(line, "EXIP") {
+				lines[li] = strings.ReplaceAll(lines[li], "EXIP", ip[:len(ip)-1])
+				break
+			}
+		}
+		output := strings.Join(lines, "\n")
+		err = ioutil.WriteFile(out, []byte(output), 0644)
+		if err != nil {
+			return errors.New("fail to write the file")
+		}
+	}
+
+	return nil
+}
+
+func UpdateBootstrapNode(ip string, num int, filepath string) error {
 	// we always update from the first node, skip the bootstrap node
 	for i := 1; i < num; i++ {
-		target := fmt.Sprintf("%s/%d", path, i)
-		in := target + "/run.sh"
-		out := target + "/deployed_run.sh"
+		target := fmt.Sprintf("%s/%d", filepath, i)
+		in := path.Join(target, "run.sh")
+		out := path.Join(target, "/deployed_run_phase1.sh")
 		input, err := ioutil.ReadFile(in)
 		if err != nil {
 			return err
@@ -80,7 +114,7 @@ func UpdateBootstrapNode(ip string, num int, path string) error {
 }
 
 func CreateNewConfigure(start, num int, storagePath string) ([]string, error) {
-	setupBech32Prefix()
+	SetupBech32Prefix()
 	var pubKeysBuf bytes.Buffer
 	var p2pid string
 	for i := start; i < start+num; i++ {
@@ -103,7 +137,7 @@ func CreateNewConfigure(start, num int, storagePath string) ([]string, error) {
 		privKey := base64.StdEncoding.EncodeToString([]byte(privKeyExported))
 		// we save the p2pid of the first node and set it fore the rest as the bootstrap node
 		if i == start {
-			p2pid, err = getP2PIDFromPrivKey(privKey)
+			p2pid, err = GetP2PIDFromPrivKey(privKey)
 			if err != nil {
 				return nil, err
 			}

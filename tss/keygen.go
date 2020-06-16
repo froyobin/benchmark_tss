@@ -22,23 +22,24 @@ type Response struct {
 }
 
 func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
-	keyGenRespArr := make([][]byte, len(ports))
+	keyGenRespArr := make([][]byte, len(IPs))
 	var locker sync.Mutex
 	var globalErr error
 	keyGenReq := Request{
 		Keys: testPubKeys,
 	}
+	fmt.Printf("######%v\n", testPubKeys)
 	request, err := json.Marshal(keyGenReq)
 	if err != nil {
 		return "", err
 	}
 	requestGroup := sync.WaitGroup{}
 
-	for i := 0; i < len(ports); i++ {
+	for i := 0; i < len(IPs); i++ {
 		requestGroup.Add(1)
-		go func(i int, request []byte, keygenRespAddr [][]byte, locker *sync.Mutex) {
+		go func(idx int, request []byte, keygenRespAddr [][]byte, locker *sync.Mutex) {
 			defer requestGroup.Done()
-			url := fmt.Sprintf("http://%s:%d/keygen", IPs[i], ports[i])
+			url := fmt.Sprintf("http://%s:%d/keygen", IPs[idx], ports[idx])
 			respByte, err := sendTestRequest(url, request)
 			if err != nil {
 				globalErr = err
@@ -50,7 +51,7 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 				return
 			}
 			locker.Lock()
-			keygenRespAddr[i] = respByte
+			keygenRespAddr[idx] = respByte
 			locker.Unlock()
 		}(i, request, keyGenRespArr, &locker)
 	}
@@ -59,7 +60,7 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 		log.Error().Err(err).Msg("error in keygen")
 		return "", nil
 	}
-	for i := 0; i < len(ports); i++ {
+	for i := 0; i < len(IPs); i++ {
 		fmt.Printf("%d------%s\n", i, keyGenRespArr[i])
 	}
 	var ret Response

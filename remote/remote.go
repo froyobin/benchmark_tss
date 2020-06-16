@@ -7,6 +7,8 @@ import (
 	"path"
 
 	"github.com/rs/zerolog/log"
+
+	"gitlab.com/thorchain/benchmark_tss/tools"
 )
 
 func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) {
@@ -26,7 +28,8 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 		cmdSent = fmt.Sprintf("ssh %s@%s -f %s", username, ip, ins)
 	} else {
 		username = "ubuntu"
-		cmdSent = fmt.Sprintf("-i %s %s@%s -f %s", pemLocation, username, ip, ins)
+		cmdSent = fmt.Sprintf("ssh -i %s  %s@%s -f sudo %s", pemLocation, username, ip, ins)
+		// cmdSent = fmt.Sprintf("-i %s %s@%s -f %s", pemLocation, username, ip, ins)
 	}
 	fmt.Println(cmdSent)
 	cmdWriter.Write([]byte(cmdSent + "\n"))
@@ -37,7 +40,7 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 	return out.String(), err
 }
 
-func doCommand(ip, remoteFile, filePath, pemLocation string, send bool, digitalOcean bool) error {
+func doCommand(ip, remoteFile, pemLocation, filePath string, digitalOcean bool) error {
 	var out bytes.Buffer
 	cmd := exec.Command("bash")
 	cmdWriter, err := cmd.StdinPipe()
@@ -47,25 +50,16 @@ func doCommand(ip, remoteFile, filePath, pemLocation string, send bool, digitalO
 	cmd.Stdout = &out
 	cmd.Start()
 	var cmdSent, username string
-	if send {
-		if digitalOcean {
-			username = "root"
-			cmdSent = fmt.Sprintf("scp  %s %s@%s:%s", filePath, username, ip, remoteFile)
-		} else {
-			username = "ubuntu"
-			cmdSent = fmt.Sprintf("scp -i %s %s %s@%s:%s", pemLocation, filePath, username, ip, remoteFile)
-		}
-		fmt.Println(cmdSent)
+
+	if digitalOcean {
+		username = "root"
+		cmdSent = fmt.Sprintf("scp  %s %s@%s:%s", filePath, username, ip, remoteFile)
 	} else {
-		// this is for retrieve file from remote, we will use that in future
-		if digitalOcean {
-			username = "root"
-			cmdSent = fmt.Sprintf("scp  %s@%s:%s %s", username, ip, remoteFile, filePath)
-		} else {
-			username = "ubuntu"
-			cmdSent = fmt.Sprintf("scp -i %s %s@%s:%s %s", pemLocation, username, ip, remoteFile, filePath)
-		}
+		username = "ubuntu"
+		cmdSent = fmt.Sprintf("scp -i %s %s %s@%s:%s", pemLocation, filePath, username, ip, remoteFile)
 	}
+	fmt.Println(cmdSent)
+
 	cmdWriter.Write([]byte(cmdSent + "\n"))
 	cmdWriter.Write([]byte("exit" + "\n"))
 
@@ -80,37 +74,39 @@ func addJob(jobs chan<- int, tasksNum int) {
 	close(jobs)
 }
 
-func doJob(i int, jobs chan int, ips []string, localFilePath, remoteFilePath, pemLocation string, isDigitalOcean bool, dones chan<- struct{}) {
+func sendTssRunScripts(i int, jobs chan int, ips []string, localFilePath, remoteFilePath, pemLocation, awsConfigurePath string, digitalOcean bool, dones chan<- struct{}) {
 	var filePath string
-
-	dockerPath := fmt.Sprintf("%s/docker-compose.yml", localFilePath)
+	var dockerPath string
+	dockerPath = fmt.Sprintf("%s/docker-compose.yml", localFilePath)
 	remoteConfigure := path.Join(remoteFilePath, "run.sh")
 	remoteDonfigure := path.Join(remoteFilePath, "docker-compose.yml")
 	defer func() {
 		dones <- struct{}{}
 	}()
 	for index := range jobs {
-		el := ips[index]
-		if len(el) == 0 {
+
+		ip := ips[index]
+		if len(ip) == 0 {
 			continue
 		}
-		if index == 0 {
-			filePath = "storage/0/run.sh"
-		} else {
-			filePath = fmt.Sprintf("%s/%d/deployed_run.sh", localFilePath, index)
-		}
-		err := doCommand(el, remoteConfigure, filePath, pemLocation, true, isDigitalOcean)
+		ip, digitalOcean = tools.AnalysisIPs(ip)
+		filePath = fmt.Sprintf("%s/%d/deployed_run.sh", localFilePath, index)
+		err := doCommand(ip, remoteConfigure, pemLocation, filePath, digitalOcean)
 		if err != nil {
-			log.Error().Err(err).Msgf("!!!fail to send to node %s\n", el)
+			log.Error().Err(err).Msgf("!!!fail to send to node %s", ip)
 		}
-		err = doCommand(el, remoteDonfigure, dockerPath, pemLocation, true, isDigitalOcean)
+		//if !digitalOcean {
+		//	awsFolder := path.Join(awsConfigurePath, ip)
+		//	dockerPath = path.Join(awsFolder, "docker-compose.sh")
+		//}
+		err = doCommand(ip, remoteDonfigure, pemLocation, dockerPath, digitalOcean)
 		if err != nil {
-			log.Error().Err(err).Msgf("!!!fail to send to node %s\n", el)
+			log.Error().Err(err).Msgf("!!!fail to send to node %s", ip)
 		}
 	}
 }
 
-func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation string, isDigitalOcean bool) error {
+func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation, awsConfigurePath string, isDigitalOcean bool) error {
 	var runErr error
 
 	worker := 5
@@ -122,7 +118,7 @@ func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation string,
 	go addJob(jobs, len(ips))
 
 	for i := 0; i < worker; i++ {
-		go doJob(i, jobs, ips, localFilePath, remoteFilePath, pemLocation, isDigitalOcean, dones)
+		go sendTssRunScripts(i, jobs, ips, localFilePath, remoteFilePath, pemLocation, awsConfigurePath, isDigitalOcean, dones)
 	}
 
 	for {

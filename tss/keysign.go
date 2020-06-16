@@ -31,9 +31,9 @@ func KeySign(inputMsg, poolPubKey string, IPs []string, ports []int, signersPubK
 	requestGroup := sync.WaitGroup{}
 	for i := 0; i < len(ports); i++ {
 		requestGroup.Add(1)
-		go func(i int, request []byte, keySignRespArr [][]byte, locker *sync.Mutex) {
+		go func(idx int, request []byte, keySignRespArr [][]byte, locker *sync.Mutex) {
 			defer requestGroup.Done()
-			url := fmt.Sprintf("http://%s:%d/keysign", IPs[i], ports[i])
+			url := fmt.Sprintf("http://%s:%d/keysign", IPs[idx], ports[idx])
 			respByte, err := sendTestRequest(url, request)
 			if err != nil {
 				log.Error().Err(err).Msg("fail to send request")
@@ -41,7 +41,7 @@ func KeySign(inputMsg, poolPubKey string, IPs []string, ports []int, signersPubK
 				return
 			}
 			locker.Lock()
-			keySignRespArr[i] = respByte
+			keySignRespArr[idx] = respByte
 			locker.Unlock()
 		}(i, request, keySignRespArr, &locker)
 	}

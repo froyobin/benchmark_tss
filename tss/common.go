@@ -12,7 +12,7 @@ import (
 func sendTestRequest(url string, request []byte) ([]byte, error) {
 	var resp *http.Response
 	var err error
-	fmt.Println(url)
+	fmt.Printf("%s\n", url)
 	if len(request) == 0 {
 		resp, err = http.Get(url)
 		if err != nil {
