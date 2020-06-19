@@ -108,7 +108,6 @@ func sendTssRunScripts(i int, jobs chan int, ips []string, localFilePath, remote
 
 func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation, awsConfigurePath string, isDigitalOcean bool) error {
 	var runErr error
-
 	worker := 5
 	working := worker
 	dones := make(chan struct{}, worker)

@@ -141,8 +141,6 @@ func deploy(initConfigure bool, hostsTablePath, remoteFilePath string, num int) 
 	}
 
 	hostIPs, err := tools.LoadStringData(hostsTablePath)
-	// as the last element of hostIP is empty, so we avoid the last entry
-	hostIPs = hostIPs[:len(hostIPs)-1]
 	if err != nil {
 		log.Error().Err(err).Msg("fail to read the host file")
 		return err
