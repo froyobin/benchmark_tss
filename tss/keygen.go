@@ -64,6 +64,10 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 		fmt.Printf("%d------%s\n", i, keyGenRespArr[i])
 	}
 	var ret Response
-	json.Unmarshal(keyGenRespArr[0], &ret)
+	err = json.Unmarshal(keyGenRespArr[0], &ret)
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to unmarshal the keygen result")
+		return "", err
+	}
 	return ret.PubKey, nil
 }

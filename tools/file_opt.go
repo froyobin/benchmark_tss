@@ -111,7 +111,7 @@ func GetRandomPick(n, m int) []int {
 
 	}
 	var picked []int
-	for k, _ := range selected {
+	for k := range selected {
 		picked = append(picked, k)
 	}
 	return picked

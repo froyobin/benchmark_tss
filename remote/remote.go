@@ -20,7 +20,11 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 	}
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	cmd.Start()
+	err = cmd.Start()
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to run command")
+		return "", err
+	}
 	var cmdSent, username string
 
 	if digitalOcean {
@@ -32,11 +36,20 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 		// cmdSent = fmt.Sprintf("-i %s %s@%s -f %s", pemLocation, username, ip, ins)
 	}
 	fmt.Println(cmdSent)
-	cmdWriter.Write([]byte(cmdSent + "\n"))
-	cmdWriter.Write([]byte("exit" + "\n"))
-	cmd.Run()
+	_, err = cmdWriter.Write([]byte(cmdSent + "\n"))
+	if err != nil {
+		return "", err
+	}
+	_, err = cmdWriter.Write([]byte("exit" + "\n"))
+	if err != nil {
+		return "", err
+	}
+	err = cmd.Run()
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to run the command")
+		return "", err
+	}
 	err = cmd.Wait()
-
 	return out.String(), err
 }
 
@@ -48,7 +61,11 @@ func doCommand(ip, remoteFile, pemLocation, filePath string, digitalOcean bool) 
 		return err
 	}
 	cmd.Stdout = &out
-	cmd.Start()
+	err = cmd.Start()
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to run the command")
+		return err
+	}
 	var cmdSent, username string
 
 	if digitalOcean {
@@ -60,9 +77,14 @@ func doCommand(ip, remoteFile, pemLocation, filePath string, digitalOcean bool) 
 	}
 	fmt.Println(cmdSent)
 
-	cmdWriter.Write([]byte(cmdSent + "\n"))
-	cmdWriter.Write([]byte("exit" + "\n"))
-
+	_, err = cmdWriter.Write([]byte(cmdSent + "\n"))
+	if err != nil {
+		return err
+	}
+	_, err = cmdWriter.Write([]byte("exit" + "\n"))
+	if err != nil {
+		return err
+	}
 	err = cmd.Wait()
 	return err
 }
@@ -74,12 +96,12 @@ func addJob(jobs chan<- int, tasksNum int) {
 	close(jobs)
 }
 
-func sendTssRunScripts(i int, jobs chan int, ips []string, localFilePath, remoteFilePath, pemLocation, awsConfigurePath string, digitalOcean bool, dones chan<- struct{}) {
+func sendTssRunScripts(i int, jobs chan int, ips []string, localFilePath, remoteFilePath, pemLocation string, dones chan<- struct{}) {
 	var filePath string
-	var dockerPath string
-	dockerPath = fmt.Sprintf("%s/docker-compose.yml", localFilePath)
+	var digitalOcean bool
+	dockerPath := fmt.Sprintf("%s/docker-compose.yml", localFilePath)
 	remoteConfigure := path.Join(remoteFilePath, "run.sh")
-	remoteDonfigure := path.Join(remoteFilePath, "docker-compose.yml")
+	remoteDockerConfigure := path.Join(remoteFilePath, "docker-compose.yml")
 	defer func() {
 		dones <- struct{}{}
 	}()
@@ -99,7 +121,7 @@ func sendTssRunScripts(i int, jobs chan int, ips []string, localFilePath, remote
 		//	awsFolder := path.Join(awsConfigurePath, ip)
 		//	dockerPath = path.Join(awsFolder, "docker-compose.sh")
 		//}
-		err = doCommand(ip, remoteDonfigure, pemLocation, dockerPath, digitalOcean)
+		err = doCommand(ip, remoteDockerConfigure, pemLocation, dockerPath, digitalOcean)
 		if err != nil {
 			log.Error().Err(err).Msgf("!!!fail to send to node %s", ip)
 		}
@@ -117,7 +139,7 @@ func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation, awsCon
 	go addJob(jobs, len(ips))
 
 	for i := 0; i < worker; i++ {
-		go sendTssRunScripts(i, jobs, ips, localFilePath, remoteFilePath, pemLocation, awsConfigurePath, isDigitalOcean, dones)
+		go sendTssRunScripts(i, jobs, ips, localFilePath, remoteFilePath, pemLocation, dones)
 	}
 
 	for {
@@ -126,7 +148,7 @@ func SendRemote(ips []string, localFilePath, remoteFilePath, pemLocation, awsCon
 		if working <= 0 {
 			done = true
 		}
-		if done == true {
+		if done {
 			break
 		}
 	}

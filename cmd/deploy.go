@@ -32,7 +32,8 @@ func getParameters(remoteFilePath, hostsTablePath *string, initConfig *bool, num
 	flag.Parse()
 }
 
-func doPrepareJob(i int, jobs chan string, digitalOcean bool, dones chan<- struct{}) error {
+func doPrepareJob(jobs chan string, dones chan<- struct{}) {
+	var digitalOcean bool
 	defer func() {
 		dones <- struct{}{}
 	}()
@@ -41,21 +42,21 @@ func doPrepareJob(i int, jobs chan string, digitalOcean bool, dones chan<- struc
 		out, err := remote.RunCommand(ip, pemLocation, "ufw disable", digitalOcean)
 		if err != nil {
 			log.Error().Err(err).Msg("error in running remote command")
-			return err
+			return
 		}
 		log.Info().Msg(out)
 		// test existing of file
 		out, err = remote.RunCommand(ip, pemLocation, "ls /home/ubuntu/go-tss/benchmark_docker/Data/data_local/", digitalOcean)
 		if err != nil {
 			log.Error().Err(err).Msg("error in running remote command")
-			return err
+			return
 		}
 		if strings.Contains(out, " No such file or directory") {
 			log.Info().Msg("we create the directory")
 			out, err = remote.RunCommand(ip, pemLocation, "mkdir -p /home/ubuntu/go-tss/benchmark_docker/Data/data_local/", digitalOcean)
 			if err != nil {
 				log.Error().Err(err).Msg("error in running remote command")
-				return err
+				return
 			}
 			log.Info().Msg(out)
 		}
@@ -63,7 +64,7 @@ func doPrepareJob(i int, jobs chan string, digitalOcean bool, dones chan<- struc
 		out, err = remote.RunCommand(ip, pemLocation, "git clone https://gitlab.com/thorchain/tss/go-tss.git /home/ubuntu/go-tss/go-tss", digitalOcean)
 		if err != nil {
 			log.Error().Err(err).Msg("error in running remote command")
-			return err
+			return
 		}
 		log.Info().Msg(out)
 
@@ -72,14 +73,13 @@ func doPrepareJob(i int, jobs chan string, digitalOcean bool, dones chan<- struc
 			out, err = remote.RunCommand(ip, pemLocation, "chown -R ubuntu.ubuntu /home/ubuntu/go-tss", digitalOcean)
 			if err != nil {
 				log.Error().Err(err).Msg("error in running remote command")
-				return err
+				return
 			}
 			log.Info().Msg(out)
 
 		}
 
 	}
-	return nil
 }
 
 func addJob(jobs chan<- string, tasks []string) {
@@ -106,7 +106,7 @@ func doDeployment(hostIPs []string, remoteFilePath, pemPath, awsConfigurePath st
 	done := false
 	go addJob(jobs, hostIPs)
 	for i := 0; i < worker; i++ {
-		go doPrepareJob(i, jobs, isDigitalOcean, dones)
+		go doPrepareJob(jobs, dones)
 	}
 
 	for {
@@ -115,7 +115,7 @@ func doDeployment(hostIPs []string, remoteFilePath, pemPath, awsConfigurePath st
 		if working <= 0 {
 			done = true
 		}
-		if done == true {
+		if done {
 			break
 		}
 	}
@@ -252,8 +252,8 @@ func main() {
 			}
 			fmt.Println(poolPubKey)
 		}
-		fmt.Printf("time we spend ms is %v\n", time.Now().Sub(timeBefore).Milliseconds()/int64(loops))
-		fmt.Printf("time we spend is %v\n", time.Now().Sub(timeBefore)/time.Duration(loops))
+		fmt.Printf("time we spend ms is %v\n", time.Since(timeBefore).Milliseconds()/int64(loops))
+		fmt.Printf("time we spend is %v\n", time.Since(timeBefore)/time.Duration(loops))
 	case 3:
 		// keysign test
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
@@ -284,7 +284,7 @@ func main() {
 				return
 			}
 		}
-		fmt.Printf("time we spend is %v\n", time.Now().Sub(timeBefore)/time.Duration(loops))
+		fmt.Printf("time we spend is %v\n", time.Since(timeBefore)/time.Duration(loops))
 
 	case 4:
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
@@ -312,7 +312,6 @@ func main() {
 			poolPubKey, err = tss.KeyGen(inputKeys, ips, ports)
 			if err != nil {
 				panic("###we quit as we saw error in keyGen")
-				return
 			}
 			fmt.Println(poolPubKey)
 		}
@@ -324,12 +323,11 @@ func main() {
 			err := tss.KeySign("hello"+string(i), poolPubKey, ips, ports, inputKeys)
 			if err != nil {
 				panic("###we quit as we saw error in keysign")
-				return
 			}
 		}
 
-		fmt.Printf("\ntime we spend ms is %v\n", time.Now().Sub(timeBeforekeyGen).Milliseconds()/int64(loops))
-		fmt.Printf("time we spend ms is %v\n", time.Now().Sub(timeBeforekeySign).Milliseconds()/int64(loops))
+		fmt.Printf("\ntime we spend ms is %v\n", time.Since(timeBeforekeyGen).Milliseconds()/int64(loops))
+		fmt.Printf("time we spend ms is %v\n", time.Since(timeBeforekeySign).Milliseconds()/int64(loops))
 
 	case 5:
 		// 16Uiu2HAm8c9uDs34BYfJqb6gaBP2iCj5TayapNptE7zEmUF7bn3e
@@ -341,6 +339,9 @@ func main() {
 
 		fmt.Printf("--------%v\n", peer.String())
 		out, err := tools.GetP2PIDFromPrivKey("ODcyNGI3MmU4NDAxMzQ5NTEzNTJlNjA3OWI4NDgxYzA1MGRlMDkwZmYzNmVlOGM5ZTNkMWU1ZDFlNzA4NDVhNw==")
+		if err != nil {
+			return
+		}
 		fmt.Printf("-=------%v\n", out)
 	default:
 		fmt.Println("not supported!!!")
