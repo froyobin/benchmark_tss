@@ -41,6 +41,7 @@ func KeySign(inputMsg, poolPubKey string, IPs []string, ports []int, signersPubK
 				return
 			}
 			locker.Lock()
+			fmt.Printf("---%d::%s\n", idx, string(respByte))
 			keySignRespArr[idx] = respByte
 			locker.Unlock()
 		}(i, request, keySignRespArr, &locker)
