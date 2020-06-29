@@ -41,7 +41,7 @@ func doPrepareJob(jobs chan string, dones chan<- struct{}) {
 		ip, digitalOcean = tools.AnalysisIPs(ip)
 		out, err := remote.RunCommand(ip, pemLocation, "ufw disable", digitalOcean)
 		if err != nil {
-			log.Error().Err(err).Msg("error in running remote command")
+			log.Error().Err(err).Msg("error in running disable firewall command")
 			return
 		}
 		log.Info().Msg(out)

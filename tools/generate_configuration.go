@@ -99,7 +99,6 @@ func UpdateBootstrapNode(ip string, num int, filepath string) error {
 		for li, line := range lines {
 			if strings.Contains(line, "IPADDR") {
 				lines[li] = strings.ReplaceAll(lines[li], "IPADDR", ip)
-				break
 			}
 		}
 		output := strings.Join(lines, "\n")
@@ -142,8 +141,12 @@ func CreateNewConfigure(start, num int, storagePath string) ([]string, error) {
 				return nil, err
 			}
 		}
-
-		templatePath := fmt.Sprintf("%s/run_template.sh", storagePath)
+		templatePath := ""
+		if i == 0 {
+			templatePath = fmt.Sprintf("%s/run_template_bootstrap.sh", storagePath)
+		} else {
+			templatePath = fmt.Sprintf("%s/run_template.sh", storagePath)
+		}
 		input, err := ioutil.ReadFile(templatePath)
 		if err != nil {
 			return nil, errors.New("cannot open the template file")

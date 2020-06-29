@@ -22,7 +22,7 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 	cmd.Stderr = &out
 	err = cmd.Start()
 	if err != nil {
-		log.Error().Err(err).Msgf("fail to run command")
+		log.Error().Err(err).Msgf("fail to run command ")
 		return "", err
 	}
 	var cmdSent, username string
@@ -35,7 +35,7 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 		cmdSent = fmt.Sprintf("ssh -i %s  %s@%s -f sudo %s", pemLocation, username, ip, ins)
 		// cmdSent = fmt.Sprintf("-i %s %s@%s -f %s", pemLocation, username, ip, ins)
 	}
-	fmt.Println(cmdSent)
+	fmt.Printf("-->%v\n", cmdSent)
 	_, err = cmdWriter.Write([]byte(cmdSent + "\n"))
 	if err != nil {
 		return "", err
@@ -46,10 +46,15 @@ func RunCommand(ip, pemLocation, ins string, digitalOcean bool) (string, error) 
 	}
 	err = cmd.Run()
 	if err != nil {
-		log.Error().Err(err).Msgf("fail to run the command")
-		return "", err
+		// todo we skip the error check as it will fail in disable the filewall
+		log.Error().Err(err).Msgf("fail to run the command we ignore this error")
+		// return "", nil
 	}
 	err = cmd.Wait()
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to wait for the command")
+		// return "", nil
+	}
 	return out.String(), err
 }
 
@@ -79,10 +84,12 @@ func doCommand(ip, remoteFile, pemLocation, filePath string, digitalOcean bool) 
 
 	_, err = cmdWriter.Write([]byte(cmdSent + "\n"))
 	if err != nil {
+		// todo
 		return err
 	}
 	_, err = cmdWriter.Write([]byte("exit" + "\n"))
 	if err != nil {
+		// todo
 		return err
 	}
 	err = cmd.Wait()
