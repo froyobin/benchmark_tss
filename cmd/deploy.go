@@ -207,6 +207,16 @@ func prepare(pubKeyPath, hostsTablePath string) ([]string, []string, []int, erro
 	return inputKeys, inputIPs, ports, nil
 }
 
+func runKeySign(poolKey string, inputKeys, ips []string, ports []int, i, loops int, done chan bool) {
+	err := tss.KeySign("hello"+string(i), poolKey, ips, ports, inputKeys)
+	if err != nil {
+		panic("error we saw")
+		fmt.Printf("######we quit as saw the error!!!")
+		return
+	}
+	done <- true
+}
+
 func main() {
 	var remoteFilePath, hostsTablePath string
 	var initConfigure bool
@@ -275,13 +285,14 @@ func main() {
 			log.Error().Err(err).Msg("invalid input")
 			return
 		}
-
+		done := make(chan bool)
 		poolKey := "thorpub1addwnpepq2txhxx0d9cg0s57ulmyv8mskmwjcmcfdu3n6rsetwty97uz328quhp84sy"
 		for i := 0; i < loops; i++ {
-			err := tss.KeySign("hello"+string(i), poolKey, ips, ports, inputKeys)
-			if err != nil {
-				fmt.Printf("######we quit as saw the error!!!")
-				return
+			select {
+			case <-done:
+				runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
+			case <-time.After(time.Second * 12):
+				panic("error timeout")
 			}
 		}
 		fmt.Printf("time we spend is %v\n", time.Since(timeBefore)/time.Duration(loops))
@@ -331,18 +342,18 @@ func main() {
 
 	case 5:
 		// 16Uiu2HAm8c9uDs34BYfJqb6gaBP2iCj5TayapNptE7zEmUF7bn3e
+
+		inputKeys, _, _, _ := prepare(pubKeyPath, hostsTablePath)
 		tools.SetupBech32Prefix()
-		peer, err := tools.GetPeerIDFromPubKey("thorpub1addwnpepqfjcw5l4ay5t00c32mmlky7qrppepxzdlkcwfs2fd5u73qrwna0vzag3y4j")
-		if err != nil {
-			fmt.Printf("-------------->%v\n", err)
+		for _, el := range inputKeys {
+			peer, err := tools.GetPeerIDFromPubKey(el)
+			if err != nil {
+				fmt.Printf("-------------->%v\n", err)
+			}
+
+			fmt.Printf("--------%v\n", peer.String())
 		}
 
-		fmt.Printf("--------%v\n", peer.String())
-		out, err := tools.GetP2PIDFromPrivKey("ODcyNGI3MmU4NDAxMzQ5NTEzNTJlNjA3OWI4NDgxYzA1MGRlMDkwZmYzNmVlOGM5ZTNkMWU1ZDFlNzA4NDVhNw==")
-		if err != nil {
-			return
-		}
-		fmt.Printf("-=------%v\n", out)
 	default:
 		fmt.Println("not supported!!!")
 		return
