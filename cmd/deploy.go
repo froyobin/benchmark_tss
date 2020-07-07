@@ -194,7 +194,7 @@ func prepare(pubKeyPath, hostsTablePath string) ([]string, []string, []int, erro
 	}
 	var inputKeys, inputIPs []string
 	var ports []int
-	selected := tools.GetRandomPick(nodeNum, len(hostIPs))
+	selected := tools.GetRandomPick(nodeNum, len(hostIPs)-1)
 	fmt.Printf("---we selected------%v\n", selected)
 	for i := 0; i < nodeNum; i++ {
 		//if i == 28 {
@@ -286,12 +286,14 @@ func main() {
 			return
 		}
 		done := make(chan bool)
-		poolKey := "thorpub1addwnpepq2txhxx0d9cg0s57ulmyv8mskmwjcmcfdu3n6rsetwty97uz328quhp84sy"
+		poolKey := "thorpub1addwnpepqw24xparjudr55nsxf55tjkag0zpyzjzeugcyr9xmfhu6uwesgp02zfyzzm"
 		for i := 0; i < loops; i++ {
+			fmt.Printf("----------------%d\n",i)
+			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
 			select {
 			case <-done:
-				runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
-			case <-time.After(time.Second * 12):
+				continue
+			case <-time.After(time.Second * 60):
 				panic("error timeout")
 			}
 		}
