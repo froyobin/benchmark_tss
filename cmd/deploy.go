@@ -194,12 +194,9 @@ func prepare(pubKeyPath, hostsTablePath string) ([]string, []string, []int, erro
 	}
 	var inputKeys, inputIPs []string
 	var ports []int
-	selected := tools.GetRandomPick(nodeNum, len(hostIPs)-1)
+	selected := tools.GetRandomPick(nodeNum, len(hostIPs))
 	fmt.Printf("---we selected------%v\n", selected)
 	for i := 0; i < nodeNum; i++ {
-		//if i == 28 {
-		//	continue
-		//}
 		inputKeys = append(inputKeys, pubKeys[selected[i]])
 		inputIPs = append(inputIPs, hostIPs[selected[i]])
 		ports = append(ports, 8080)
@@ -286,9 +283,9 @@ func main() {
 			return
 		}
 		done := make(chan bool)
-		poolKey := "thorpub1addwnpepqw24xparjudr55nsxf55tjkag0zpyzjzeugcyr9xmfhu6uwesgp02zfyzzm"
+		poolKey := "thorpub1addwnpepq2ck4y274cyk0yas57702n3phmv7fwnhelwuw5907ygjklfnu9tw54sjwa5"
 		for i := 0; i < loops; i++ {
-			fmt.Printf("----------------%d\n",i)
+			fmt.Printf("----------------%d\n", i)
 			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
 			select {
 			case <-done:

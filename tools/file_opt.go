@@ -104,9 +104,6 @@ func GetRandomPick(n, m int) []int {
 			break
 		}
 		n := rand.Int() % m
-		//if n == 28 {
-		//	continue
-		//}
 		selected[n] = true
 
 	}

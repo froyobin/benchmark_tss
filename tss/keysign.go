@@ -16,6 +16,33 @@ type KeySignReq struct {
 	SignerPubKeys []string `json:"signer_pub_keys"`
 }
 
+type Node struct {
+	Pubkey         string `json:"pubkey"`
+	BlameData      []byte `json:"data"`
+	BlameSignature []byte `json:"signature,omitempty"`
+}
+
+type Blame struct {
+	FailReason string `json:"fail_reason"`
+	IsUnicast  bool   `json:"is_broadcast"`
+	BlameNodes []Node `json:"blame_peers,omitempty"`
+}
+
+type Status byte
+
+const (
+	NA Status = iota
+	Success
+	Fail
+)
+
+type KeySignResponse struct {
+	R      string `json:"r"`
+	S      string `json:"s"`
+	Status Status `json:"status"`
+	Blame  Blame  `json:"blame"`
+}
+
 func KeySign(inputMsg, poolPubKey string, IPs []string, ports []int, signersPubKey []string) error {
 	var locker sync.Mutex
 	keySignRespArr := make([][]byte, len(ports))
@@ -34,14 +61,24 @@ func KeySign(inputMsg, poolPubKey string, IPs []string, ports []int, signersPubK
 		go func(idx int, request []byte, keySignRespArr [][]byte, locker *sync.Mutex) {
 			defer requestGroup.Done()
 			url := fmt.Sprintf("http://%s:%d/keysign", IPs[idx], ports[idx])
+
 			respByte, err := sendTestRequest(url, request)
 			if err != nil {
 				log.Error().Err(err).Msg("fail to send request")
 				globalErr = err
+				panic("error in keysign")
 				return
 			}
-			locker.Lock()
 			fmt.Printf("---%d::%s\n", idx, string(respByte))
+			var response KeySignResponse
+			err = json.Unmarshal(respByte, &response)
+			if err != nil {
+				panic("fail to get the valid signature")
+			}
+			if response.Status == Fail {
+				panic("error in get signature")
+			}
+			locker.Lock()
 			keySignRespArr[idx] = respByte
 			locker.Unlock()
 		}(i, request, keySignRespArr, &locker)

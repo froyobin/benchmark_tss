@@ -28,7 +28,6 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 	keyGenReq := Request{
 		Keys: testPubKeys,
 	}
-	fmt.Printf("######%v\n", testPubKeys)
 	request, err := json.Marshal(keyGenReq)
 	if err != nil {
 		return "", err
