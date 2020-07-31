@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -194,7 +195,12 @@ func prepare(pubKeyPath, hostsTablePath string) ([]string, []string, []int, erro
 	}
 	var inputKeys, inputIPs []string
 	var ports []int
-	selected := tools.GetRandomPick(nodeNum, len(hostIPs))
+	var selected []int
+	//for i := 0; i < nodeNum; i++ {
+	//	selected = append(selected, i)
+	//}
+	selected = tools.GetRandomPick(nodeNum, len(hostIPs))
+	sort.Ints(selected)
 	fmt.Printf("---we selected------%v\n", selected)
 	for i := 0; i < nodeNum; i++ {
 		inputKeys = append(inputKeys, pubKeys[selected[i]])
@@ -207,7 +213,6 @@ func prepare(pubKeyPath, hostsTablePath string) ([]string, []string, []int, erro
 func runKeySign(poolKey string, inputKeys, ips []string, ports []int, i, loops int, done chan bool) {
 	err := tss.KeySign("hello"+string(i), poolKey, ips, ports, inputKeys)
 	if err != nil {
-		panic("error we saw")
 		fmt.Printf("######we quit as saw the error!!!")
 		return
 	}
@@ -283,7 +288,7 @@ func main() {
 			return
 		}
 		done := make(chan bool)
-		poolKey := "thorpub1addwnpepq2ck4y274cyk0yas57702n3phmv7fwnhelwuw5907ygjklfnu9tw54sjwa5"
+		poolKey := "thorpub1addwnpepqgpzp4w4crp97vfnfx4n0umtu3aea6zdx5tmr0qry7rlc2x5caa7x2cq3t0"
 		for i := 0; i < loops; i++ {
 			fmt.Printf("----------------%d\n", i)
 			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
@@ -294,6 +299,7 @@ func main() {
 				panic("error timeout")
 			}
 		}
+
 		fmt.Printf("time we spend is %v\n", time.Since(timeBefore)/time.Duration(loops))
 
 	case 4:
@@ -316,41 +322,42 @@ func main() {
 			return
 		}
 		var poolPubKey string
-		timeBeforekeyGen := time.Now()
+		timeBeforeKeyGen := time.Now()
 		for i := 0; i < loops; i++ {
 			fmt.Printf("-----we run %d/%d tests\n", i, loops)
 			poolPubKey, err = tss.KeyGen(inputKeys, ips, ports)
 			if err != nil {
 				panic("###we quit as we saw error in keyGen")
 			}
-			fmt.Println(poolPubKey)
+			// fmt.Println(poolPubKey)
 		}
-
+		timeAfterKeyGen := time.Now()
 		fmt.Print("now we do the keysign test")
 
-		timeBeforekeySign := time.Now()
+		timeBeforeKeySign := time.Now()
 		for i := 0; i < loops; i++ {
 			err := tss.KeySign("hello"+string(i), poolPubKey, ips, ports, inputKeys)
 			if err != nil {
 				panic("###we quit as we saw error in keysign")
 			}
 		}
+		timeAfterKeySign := time.Now()
 
-		fmt.Printf("\ntime we spend ms is %v\n", time.Since(timeBeforekeyGen).Milliseconds()/int64(loops))
-		fmt.Printf("time we spend ms is %v\n", time.Since(timeBeforekeySign).Milliseconds()/int64(loops))
+		fmt.Printf("\ntime we spend for keygen(ms) is %v\n", timeAfterKeyGen.Sub(timeBeforeKeyGen).Milliseconds()/int64(loops))
+		fmt.Printf("time we spend for keysign(ms) is %v\n", timeAfterKeySign.Sub(timeBeforeKeySign).Milliseconds()/int64(loops))
 
 	case 5:
 		// 16Uiu2HAm8c9uDs34BYfJqb6gaBP2iCj5TayapNptE7zEmUF7bn3e
 
 		inputKeys, _, _, _ := prepare(pubKeyPath, hostsTablePath)
 		tools.SetupBech32Prefix()
-		for _, el := range inputKeys {
+		for i, el := range inputKeys {
 			peer, err := tools.GetPeerIDFromPubKey(el)
 			if err != nil {
-				fmt.Printf("-------------->%v\n", err)
+				fmt.Printf("-----%d-------->%v\n", i, err)
 			}
 
-			fmt.Printf("--------%v\n", peer.String())
+			fmt.Printf("----%d---%v\n", i, peer.String())
 		}
 
 	default:

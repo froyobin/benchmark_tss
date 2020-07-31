@@ -16,9 +16,7 @@ type Response struct {
 	PubKey      string `json:"pub_key"`
 	PoolAddress string `json:"pool_address"`
 	Status      int    `json:"status"`
-	Blame       struct {
-		FailReason string `json:"fail_reason"`
-	} `json:"blame"`
+	Blame       Blame
 }
 
 func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
@@ -42,10 +40,12 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 			respByte, err := sendTestRequest(url, request)
 			if err != nil {
 				globalErr = err
+				fmt.Printf("%d--err:%v--%s\n", i, err, string(respByte))
 				return
 			}
 			if err != nil {
 				log.Error().Err(err).Msg("error in unmarshal the result")
+				fmt.Printf("%d----%s", i, string(respByte))
 				globalErr = err
 				return
 			}
@@ -59,14 +59,47 @@ func KeyGen(testPubKeys []string, IPs []string, ports []int) (string, error) {
 		log.Error().Err(err).Msg("error in keygen")
 		return "", nil
 	}
-	for i := 0; i < len(IPs); i++ {
-		fmt.Printf("%d------%s\n", i, keyGenRespArr[i])
-	}
+	//for i := 0; i < len(IPs); i++ {
+	//	fmt.Printf("%d------%s\n", i, keyGenRespArr[i])
+	//}
 	var ret Response
 	err = json.Unmarshal(keyGenRespArr[0], &ret)
 	if err != nil {
 		log.Error().Err(err).Msgf("fail to unmarshal the keygen result")
-		return "", err
+		// return "", err
 	}
+
+	votes := make(map[string]int)
+	for i, itemstr := range keyGenRespArr {
+		var item Response
+		err = json.Unmarshal(itemstr, &item)
+		if err != nil {
+			log.Error().Err(err).Msgf("fail to unmarshal the keygen result")
+			// return "", err
+			continue
+		}
+
+		fmt.Printf("\nresult::>>%d---status:%v-unicast(%v)->%v\n", i, item.Status, item.Blame.IsUnicast, item.Blame)
+		_ = i
+		for _, el := range item.Blame.BlameNodes {
+			_, ok := votes[el.Pubkey]
+			if !ok {
+				votes[el.Pubkey] = 1
+				continue
+			}
+			votes[el.Pubkey] += 1
+		}
+		//if len(poolPubKey) == 0 {
+		//	poolPubKey = item.PubKey
+		//} else {
+		//	c.Assert(poolPubKey, Equals, item.PubKey)
+		//}
+	}
+	fmt.Printf("------------------------------\n")
+	for k, v := range votes {
+		fmt.Printf("node %s :-->%d\n", k, v)
+	}
+	fmt.Printf("------------------------------\n")
+
 	return ret.PubKey, nil
 }
