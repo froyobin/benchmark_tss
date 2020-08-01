@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -283,10 +284,15 @@ func main() {
 			return
 		}
 		done := make(chan bool)
-		poolKey := "thorpub1addwnpepq2ck4y274cyk0yas57702n3phmv7fwnhelwuw5907ygjklfnu9tw54sjwa5"
+		poolKey := "thorpub1addwnpepqtyjdc48dph7sf5mnjpyjkjsjs9zfqwz8clu9u9e44v65x8dmx64krdfa7z"
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(inputKeys), func(i, j int) {
+			inputKeys[i], inputKeys[j] = inputKeys[j], inputKeys[i]
+		})
+
 		for i := 0; i < loops; i++ {
 			fmt.Printf("----------------%d\n", i)
-			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
+			go runKeySign(poolKey, inputKeys[:13], ips, ports, i, loops, done)
 			select {
 			case <-done:
 				continue
