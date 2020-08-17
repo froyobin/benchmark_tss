@@ -24,7 +24,7 @@ type Node struct {
 
 type Blame struct {
 	FailReason string `json:"fail_reason"`
-	IsUnicast  bool   `json:"is_broadcast"`
+	IsUnicast  bool   `json:"is_unicast"`
 	BlameNodes []Node `json:"blame_peers,omitempty"`
 }
 
