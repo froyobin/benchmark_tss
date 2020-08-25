@@ -288,7 +288,7 @@ func main() {
 			return
 		}
 		done := make(chan bool)
-		poolKey := "thorpub1addwnpepqgpzp4w4crp97vfnfx4n0umtu3aea6zdx5tmr0qry7rlc2x5caa7x2cq3t0"
+		poolKey := "thorpub1addwnpepqg0vs2njqwhh90vw7sp4qvfuc8m2q8a4ddgcza0mc3k33x6ahzg9xenwkwj"
 		for i := 0; i < loops; i++ {
 			fmt.Printf("----------------%d\n", i)
 			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done)
