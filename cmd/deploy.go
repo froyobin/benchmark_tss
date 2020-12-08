@@ -276,7 +276,6 @@ func main() {
 		if err != nil {
 			return
 		}
-		timeBefore := time.Now()
 
 		input, err := tools.GetInput("please input the rounds you want to benchmark")
 		if err != nil {
@@ -302,16 +301,16 @@ func main() {
 		poolKey := "thorpub1addwnpepqv8l433ryg6r0k9lsk5qqnayagxjxx9tpq4su3c38g27lcx8neesjpngasj"
 		for i := 0; i < loops; i++ {
 			fmt.Printf("----------------%d\n", i)
+			timeBefore := time.Now()
 			go runKeySign(poolKey, inputKeys, ips, ports, i, loops, done, int64(i+1000), batchSize)
 			select {
 			case <-done:
+				fmt.Printf("time we spend is %v\n", time.Since(timeBefore))
 				continue
 			case <-time.After(time.Second * 6000):
 				panic("error timeout")
 			}
 		}
-
-		fmt.Printf("time we spend is %v\n", time.Since(timeBefore)/time.Duration(loops))
 
 	case 4:
 		inputKeys, inputIPs, ports, err := prepare(pubKeyPath, hostsTablePath)
