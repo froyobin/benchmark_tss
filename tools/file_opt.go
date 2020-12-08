@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -99,13 +100,13 @@ func GenerateComposeForAWS(storagePath string, targetIPs []string) (string, erro
 
 func GetRandomPick(n, m int) []int {
 	selected := make(map[int]bool)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for {
 		if len(selected) == n {
 			break
 		}
-		n := rand.Int() % m
+		n := r.Int() % m
 		selected[n] = true
-
 	}
 	var picked []int
 	for k := range selected {

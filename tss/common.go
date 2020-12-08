@@ -22,15 +22,15 @@ func sendTestRequest(url string, request []byte) ([]byte, error) {
 	} else {
 		resp, err = http.Post(url, "application/json", bytes.NewBuffer(request))
 		if err != nil {
-			log.Error().Err(err)
+			log.Error().Err(err).Msgf("fail to send post")
 			return nil, err
 
 		}
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Error().Err(err)
-		return nil, err
+		log.Error().Err(err).Msgf("msg body--%s", body)
+		return body, err
 	}
 	return body, nil
 }
